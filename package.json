@@ -1,0 +1,27 @@
+{
+  "name": "techprep-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered interview preparation platform for senior tech professionals",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm -w apps/frontend run dev",
+    "dev:backend": "npm -w apps/backend run start:dev",
+    "build:all": "npm -w packages/shared run build && npm -w apps/backend run build && npm -w apps/frontend run build",
+    "build:frontend": "npm -w apps/frontend run build",
+    "build:backend": "npm -w apps/backend run build",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
