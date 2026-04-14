@@ -13,6 +13,9 @@ export interface User {
   sessionCount: number;
   questionsAttempted: number;
   completedQuestionIds: string[];
+  trackProgress?: Record<string, number>;
+  points?: number;
+  streak?: number;
   lastActiveAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +38,8 @@ export interface Question {
   timeLimitSeconds: number;
   sampleAnswerOutline?: string;
   isPublished: boolean;
+  status: string;
+  reviewNotes?: string;
   tags: string[];
   attemptCount: number;
   avgScore: number;
@@ -56,6 +61,8 @@ export interface Topic {
   order: number;
   estimatedReadMinutes: number;
   isPublished: boolean;
+  status: string;
+  reviewNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

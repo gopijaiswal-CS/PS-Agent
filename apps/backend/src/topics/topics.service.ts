@@ -12,13 +12,20 @@ export class TopicsService {
 
   async findAll(query: QueryTopicsDto) {
     const { track, category, page = 1, limit = 50 } = query;
-    const filter: any = { isPublished: true };
+    const filter: any = {};
+
     if (track) filter.track = track;
     if (category) filter.category = category;
 
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status;
+    } else if (!query.status) {
+      filter.$or = [{ status: 'LIVE' }, { isPublished: true }];
+    }
+
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      this.topicModel.find(filter).skip(skip).limit(limit).sort({ order: 1 }).lean(),
+      this.topicModel.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }).lean(),
       this.topicModel.countDocuments(filter),
     ]);
 

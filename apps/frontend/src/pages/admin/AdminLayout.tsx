@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 const NAV_ITEMS = [
   { path: '/admin/questions', label: 'Questions', icon: '📝' },
   { path: '/admin/topics', label: 'Topics', icon: '📖' },
+  { path: '/admin/approvals', label: 'Approvals', icon: '✅' },
   { path: '/admin/users', label: 'Users', icon: '👥' },
   { path: '/admin/analytics', label: 'Analytics', icon: '📊' },
 ];

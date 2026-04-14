@@ -31,8 +31,11 @@ export class Topic {
   @Prop()
   estimatedReadMinutes: number;
 
-  @Prop({ default: true })
-  isPublished: boolean;
+  @Prop({ required: true, enum: ['DRAFT', 'PENDING', 'LIVE'], default: 'DRAFT' })
+  status: string;
+
+  @Prop()
+  reviewNotes: string;
 }
 
 export type TopicDocument = Topic & Document;
@@ -40,4 +43,4 @@ export const TopicSchema = SchemaFactory.createForClass(Topic);
 
 TopicSchema.index({ track: 1 });
 TopicSchema.index({ category: 1 });
-TopicSchema.index({ isPublished: 1 });
+TopicSchema.index({ status: 1 });

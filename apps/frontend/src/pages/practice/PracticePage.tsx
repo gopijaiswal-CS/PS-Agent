@@ -1,156 +1,228 @@
-import { type FC, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { type FC, useState, useCallback, useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Timer } from '@/components/ui/Timer';
 import { AiChatPanel } from '@/components/chat/AiChatPanel';
 import { VoicePanel } from '@/components/voice/VoicePanel';
 import { RatingModal } from '@/components/rating/RatingModal';
-import type { AiRating } from '@/types';
-
-const MOCK_QUESTIONS = {
-  hld: [
-    { id: '1', title: 'Design a URL Shortener', difficulty: 3, tags: ['Hashing', 'Cache', 'NoSQL'], completed: false, description: 'Design a system that takes long URLs and converts them into short, unique URLs. The system should handle millions of URL shortenings per day, redirect users to the original URL when they visit the short link, and provide analytics on link usage. Consider scalability, availability, and data consistency.', timeLimitSeconds: 2400 },
-    { id: '2', title: 'Design Twitter/X Feed', difficulty: 4, tags: ['Fan-out', 'Pub/Sub', 'Timeline'], completed: false, description: 'Design the home feed system for Twitter/X. Users should see tweets from accounts they follow, ordered by relevance and recency. Consider the fan-out problem, real-time delivery, and how to handle celebrity accounts with millions of followers.', timeLimitSeconds: 2400 },
-    { id: '3', title: 'Design Uber/Lyft', difficulty: 5, tags: ['Geospatial', 'Matching', 'Real-time'], completed: false, description: 'Design a ride-sharing platform like Uber. Include the driver-rider matching algorithm, location tracking, pricing engine, and trip management. Consider real-time requirements and geographical distribution.', timeLimitSeconds: 3600 },
-    { id: '4', title: 'Design Netflix Streaming', difficulty: 4, tags: ['CDN', 'Video', 'Adaptive'], completed: false, description: 'Design a video streaming platform like Netflix. Handle video encoding, content delivery via CDN, adaptive bitrate streaming, and the recommendation engine. Consider global scale and varying network conditions.', timeLimitSeconds: 2400 },
-  ],
-  lld: [
-    { id: '5', title: 'Design a Parking Lot', difficulty: 2, tags: ['OOP', 'Strategy'], completed: false, description: 'Design an object-oriented parking lot system. Support multiple levels, different vehicle sizes (motorcycle, car, bus), and multiple entry/exit points. Track availability and calculate parking fees.', timeLimitSeconds: 1800 },
-    { id: '6', title: 'Design a Chess Game', difficulty: 3, tags: ['State Machine', 'Observer'], completed: false, description: 'Design a chess game with proper piece movement rules, check/checkmate detection, castling, en passant, and pawn promotion. Use appropriate design patterns.', timeLimitSeconds: 2400 },
-  ],
-  dsa: [
-    { id: '7', title: 'LRU Cache', difficulty: 2, tags: ['Hash Map', 'Linked List'], completed: false, description: 'Implement a Least Recently Used (LRU) cache with O(1) get and put operations. The cache should evict the least recently used item when capacity is reached.', timeLimitSeconds: 1800 },
-    { id: '8', title: 'Serialize Binary Tree', difficulty: 3, tags: ['Tree', 'BFS/DFS'], completed: false, description: 'Design an algorithm to serialize and deserialize a binary tree. The serialized format should preserve the tree structure and allow reconstruction.', timeLimitSeconds: 1800 },
-  ],
-};
+import { Whiteboard } from '@/components/ui/Whiteboard';
+import { questionsApi } from '@/api/questions.api';
+import type { Question, AiRating } from '@/types';
+import { sessionsApi } from '@/api/sessions.api';
 
 const TRACK_LABELS: Record<string, { name: string; icon: string }> = {
   hld: { name: 'High-Level Design', icon: '🏗️' },
   lld: { name: 'Low-Level Design', icon: '⚙️' },
-  dsa: { name: 'DSA', icon: '🧮' },
-  'ai-ml': { name: 'AI / ML', icon: '🤖' },
+  dsa: { name: 'Data Structures', icon: '🧮' },
+  'ai-ml': { name: 'AI / ML Design', icon: '🤖' },
   behavioral: { name: 'Behavioral', icon: '💬' },
 };
 
 const DifficultyDots: FC<{ level: number }> = ({ level }) => (
-  <div className="difficulty-dots">
+  <div className="flex gap-1">
     {[1, 2, 3, 4, 5].map((i) => (
-      <div key={i} className={`difficulty-dot ${i <= level ? 'filled' : 'empty'}`} />
+      <div 
+        key={i} 
+        className={`w-1.5 h-1.5 rounded-full transition-all ${
+          i <= level 
+            ? level >= 4 ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' 
+              : level >= 3 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' 
+                : 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+            : 'bg-theme-border opacity-50'
+        }`} 
+      />
     ))}
   </div>
 );
 
-const MOCK_RATING: AiRating = {
-  scalability: 8,
-  correctness: 7,
-  completeness: 6,
-  clarity: 9,
-  overall: 7.4,
-  voiceScore: 7,
-  strengths: ['Good use of consistent hashing for URL distribution', 'Correct cache invalidation strategy with write-through pattern'],
-  improvements: ['Missing rate limiting layer for abuse prevention', 'DB sharding strategy not fully explained', 'Analytics pipeline could use stream processing'],
-  nextSteps: 'Study rate limiting patterns (token bucket, sliding window) and stream processing with Kafka.',
-};
-
 export const PracticePage: FC = () => {
   const navigate = useNavigate();
-  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
+  const { questionId } = useParams<{ questionId?: string }>();
+  
+  const [groupedQuestions, setGroupedQuestions] = useState<Record<string, Question[]>>({});
   const [sidebarSearch, setSidebarSearch] = useState('');
-  const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({ hld: true, lld: true, dsa: true });
+  const [expandedTracks, setExpandedTracks] = useState<Record<string, boolean>>({ hld: true, lld: true, dsa: true, 'ai-ml': true, behavioral: true });
+  
+  // Real active session integration
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
   const [showRating, setShowRating] = useState(false);
+  const [ratingData, setRatingData] = useState<AiRating | null>(null);
+  const [isRating, setIsRating] = useState(false);
+  
   const [showVoice, setShowVoice] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [currentHint, setCurrentHint] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState('');
 
-  const toggleTrack = (track: string) => {
-    setExpandedTracks((prev) => ({ ...prev, [track]: !prev[track] }));
-  };
-
-  const selectedQ = Object.values(MOCK_QUESTIONS).flat().find((q) => q.id === selectedQuestion);
-
-  const handleStartSolving = useCallback(() => {
-    setIsSessionActive(true);
-    setHintsUsed(0);
-    setCurrentHint(null);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await questionsApi.getGrouped();
+        setGroupedQuestions(res.data.data);
+      } catch (e) {
+        console.error('Failed to load questions', e);
+      }
+    }
+    loadData();
   }, []);
+
+  const toggleTrack = (track: string) => setExpandedTracks((prev) => ({ ...prev, [track]: !prev[track] }));
+
+  // Find the selected question across all tracks
+  const selectedQ = useMemo(() => {
+    if (!questionId) return null;
+    for (const trackQs of Object.values(groupedQuestions)) {
+      const q = trackQs.find(q => q._id === questionId);
+      if (q) return q;
+    }
+    return null;
+  }, [questionId, groupedQuestions]);
+
+  const currentTrack = selectedQ?.track || 'hld';
+
+  const handleStartSolving = useCallback(async () => {
+    if (!selectedQ) return;
+    try {
+      const res = await sessionsApi.create(selectedQ._id);
+      setCurrentSessionId(res.data.data._id);
+      setIsSessionActive(true);
+      setHintsUsed(0);
+      setCurrentHint(null);
+    } catch (err) {
+      console.error('Failed to initialize session on server.', err);
+      // Fallback local mode
+      setIsSessionActive(true);
+    }
+  }, [selectedQ]);
 
   const handleGetHint = useCallback(() => {
-    const hints = [
-      'What happens when two users submit the same long URL at the same time?',
-      'Consider using a key-value store like Redis for fast lookups. You might need base62 encoding with a distributed counter.',
-      'A complete solution would include: Load Balancer → App Servers → Cache (Redis) → Database (DynamoDB/Cassandra). Use a Zookeeper-based counter for unique ID generation, then base62-encode it.',
-    ];
-    const nextLevel = Math.min(hintsUsed + 1, 3);
-    setHintsUsed(nextLevel);
-    setCurrentHint(hints[nextLevel - 1]);
-  }, [hintsUsed]);
+    if (!selectedQ || !selectedQ.hints) return;
+    const nextLevel = Math.min(hintsUsed + 1, selectedQ.hints.length);
+    if (nextLevel > 0) {
+      setHintsUsed(nextLevel);
+      setCurrentHint(selectedQ.hints[nextLevel - 1]);
+    }
+  }, [hintsUsed, selectedQ]);
 
-  const handleTranscriptReady = useCallback((transcript: string) => {
-    console.log('Transcript saved:', transcript.slice(0, 100));
+  const handleTranscriptReady = useCallback((t: string) => {
+    setTranscript(prev => prev + ' ' + t);
   }, []);
 
+  const handleRateDesign = async () => {
+    if (!currentSessionId) {
+      alert("No active session tracked by server.");
+      return;
+    }
+    setIsRating(true);
+    try {
+      if (transcript) await sessionsApi.updateTranscript(currentSessionId, transcript);
+      const res = await sessionsApi.rate(currentSessionId);
+      setRatingData(res.data.data);
+      setShowRating(true);
+    } catch (err) {
+      console.error('Failed to rate design:', err);
+      alert('Failed to rate design. Check Claude proxy or token.');
+    } finally {
+      setIsRating(false);
+    }
+  };
+
+  const onQuestionSelect = (id: string) => {
+    navigate(`/practice/q/${id}`);
+    setIsSessionActive(false);
+    setCurrentHint(null);
+    setHintsUsed(0);
+  };
+
   return (
-    <div className="h-screen flex flex-col bg-surface-950">
+    <div className="h-full flex flex-col bg-surface-950">
       {/* Top bar */}
-      <div className="h-14 border-b border-surface-800/50 bg-surface-950/80 backdrop-blur-xl flex items-center justify-between px-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="btn-ghost px-2 py-1">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 18l-6-6 6-6" /></svg>
-          </button>
-          <div className="w-7 h-7 rounded-md bg-brand-600/20 border border-brand-500/30 flex items-center justify-center">
-            <svg width="14" height="14" viewBox="0 0 32 32" fill="none"><path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="url(#tp-logo2)" /><defs><linearGradient id="tp-logo2" x1="4" y1="2" x2="28" y2="30"><stop stopColor="#818cf8" /><stop offset="1" stopColor="#c084fc" /></linearGradient></defs></svg>
+      <div className="h-14 border-b border-theme/30 bg-theme flex flex-col justify-center px-4 flex-shrink-0 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <span className="text-sm font-semibold text-theme">
+               Interactive Practice
+             </span>
           </div>
-          <span className="text-sm font-semibold text-surface-200">TechPrep Pro</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {isSessionActive && selectedQ && (
-            <Timer initialSeconds={selectedQ.timeLimitSeconds} isRunning={isSessionActive} />
-          )}
-          {selectedQ && <Badge variant="brand">{selectedQ.tags[0]?.toUpperCase()}</Badge>}
+          <div className="flex items-center gap-3">
+            {isSessionActive && selectedQ && (
+              <Timer initialSeconds={selectedQ.timeLimitSeconds} isRunning={isSessionActive} />
+            )}
+            {selectedQ && <Badge variant="brand">{selectedQ.tags[0]?.toUpperCase()}</Badge>}
+          </div>
         </div>
       </div>
 
       {/* Three panel layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* LEFT SIDEBAR */}
-        <div className="w-72 border-r border-surface-800/50 bg-surface-950/50 flex flex-col flex-shrink-0">
-          <div className="p-3">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-              <input type="text" placeholder="Search questions..." value={sidebarSearch} onChange={(e) => setSidebarSearch(e.target.value)} className="input-field pl-10 py-2 text-xs" />
+        {/* LEFT SIDEBAR - BEAUTIFIED */}
+        <div className="w-80 border-r border-theme/20 bg-theme-elevated/40 flex flex-col flex-shrink-0 backdrop-blur-xl">
+          <div className="p-4 border-b border-theme/20 bg-theme/30">
+            <div className="relative group">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted group-focus-within:text-brand-500 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+              <input 
+                type="text" 
+                placeholder="Search questions..." 
+                value={sidebarSearch} 
+                onChange={(e) => setSidebarSearch(e.target.value)} 
+                className="w-full bg-theme/50 border border-theme/20 rounded-xl pl-10 pr-4 py-2.5 text-sm text-theme placeholder:text-theme-muted/50 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/30 transition-all" 
+              />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-2 pb-4">
-            {Object.entries(MOCK_QUESTIONS).map(([track, questions]) => {
+          
+          <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
+            {Object.entries(groupedQuestions).map(([track, questions]) => {
               const trackInfo = TRACK_LABELS[track];
               const filteredQs = questions.filter((q) => q.title.toLowerCase().includes(sidebarSearch.toLowerCase()));
               if (filteredQs.length === 0 && sidebarSearch) return null;
+              
               return (
-                <div key={track} className="mb-1">
-                  <button onClick={() => toggleTrack(track)} className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-surface-400 uppercase tracking-wider hover:text-surface-200 transition-colors">
-                    <svg className={`w-3 h-3 transition-transform ${expandedTracks[track] ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="currentColor"><path d="M9 18l6-6-6-6" /></svg>
-                    <span>{trackInfo?.icon}</span>
-                    <span>{trackInfo?.name}</span>
-                    <span className="ml-auto text-surface-600 text-2xs">{questions.length}</span>
-                  </button>
-                  {expandedTracks[track] && (
-                    <div className="space-y-0.5 ml-2">
-                      {filteredQs.map((q) => (
-                        <button key={q.id} onClick={() => { setSelectedQuestion(q.id); setIsSessionActive(false); setCurrentHint(null); setHintsUsed(0); }}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all duration-200 ${
-                            selectedQuestion === q.id ? 'bg-brand-500/10 text-brand-400 border-l-2 border-brand-500' : 'text-surface-300 hover:bg-surface-800/50 hover:text-surface-100'
-                          }`}>
-                          <div className="flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${q.completed ? 'bg-accent-emerald' : 'bg-surface-600'}`} />
-                            <span className="truncate">{q.title}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1 ml-3.5"><DifficultyDots level={q.difficulty} /></div>
-                        </button>
-                      ))}
+                <div key={track} className="mb-4">
+                  <button 
+                    onClick={() => toggleTrack(track)} 
+                    className="w-full flex items-center justify-between px-2 py-2 mb-1 group"
+                  >
+                    <div className="flex items-center gap-2">
+                       <span className="text-base grayscale group-hover:grayscale-0 transition-all">{trackInfo?.icon}</span>
+                       <span className="text-xs font-bold text-theme-secondary uppercase tracking-widest group-hover:text-theme transition-colors">{trackInfo?.name || track}</span>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xs font-medium px-1.5 py-0.5 rounded-md bg-theme/30 text-theme-muted">{questions.length}</span>
+                      <svg className={`w-3.5 h-3.5 text-theme-muted transition-transform duration-300 ${expandedTracks[track] ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+                    </div>
+                  </button>
+                  
+                  <div className={`space-y-1 overflow-hidden transition-all duration-300 ease-in-out ${expandedTracks[track] ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                    {filteredQs.map((q) => {
+                      const isSelected = questionId === q._id;
+                      return (
+                        <button 
+                          key={q._id} 
+                          onClick={() => onQuestionSelect(q._id)}
+                          className={`w-full text-left px-3 py-3 rounded-xl transition-all duration-200 group relative ${
+                            isSelected 
+                              ? 'bg-gradient-to-r from-brand-500/10 to-transparent border-l-2 border-brand-500 shadow-sm' 
+                              : 'hover:bg-theme-elevated/80 border-l-2 border-transparent'
+                          }`}
+                        >
+                          <div className="flex justify-between items-start mb-1.5">
+                            <span className={`text-sm font-medium leading-snug line-clamp-2 pr-2 ${isSelected ? 'text-theme' : 'text-theme-secondary group-hover:text-theme'}`}>
+                              {q.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <DifficultyDots level={q.difficulty} />
+                            <span className="text-2xs text-theme-muted font-medium bg-theme/40 px-1.5 rounded">
+                              {q.timeLimitSeconds ? Math.floor(q.timeLimitSeconds / 60) : 45}m
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
@@ -158,94 +230,145 @@ export const PracticePage: FC = () => {
         </div>
 
         {/* CENTER */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#06080F]">
           {selectedQ ? (
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="max-w-2xl">
-                <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-3 flex-wrap">
-                    <Badge variant="brand">{selectedQ.tags[0]?.toUpperCase() || 'HLD'}</Badge>
-                    <DifficultyDots level={selectedQ.difficulty} />
-                    <span className="text-xs text-surface-500">{selectedQ.timeLimitSeconds / 60} min</span>
+            <div className="flex-1 flex flex-col overflow-y-auto">
+              {/* Custom header area with gradient background */}
+              <div className="relative pt-8 pb-6 px-8 border-b border-theme/10">
+                <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-transparent pointer-events-none" />
+                <div className="relative max-w-2xl">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <Badge variant="brand" className="backdrop-blur-sm bg-brand-500/10 border-brand-500/20">{selectedQ.tags[0]?.toUpperCase() || 'HLD'}</Badge>
+                        <div className="flex items-center gap-2 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
+                          <span className="text-xs font-semibold text-theme-muted uppercase tracking-wider">Difficulty</span>
+                          <DifficultyDots level={selectedQ.difficulty} />
+                        </div>
+                        <span className="text-xs font-semibold text-theme-muted flex items-center gap-1.5 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          {Math.floor(selectedQ.timeLimitSeconds / 60)} min
+                        </span>
+                      </div>
+                      <h2 className="text-3xl font-extrabold text-theme tracking-tight leading-tight">{selectedQ.title}</h2>
+                    </div>
                   </div>
-                  <h2 className="text-2xl font-bold text-surface-50 mb-3">{selectedQ.title}</h2>
-                  <p className="text-surface-400 text-sm leading-relaxed">{selectedQ.description}</p>
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {selectedQ.tags.slice(1).map((tag) => (
+                      <span key={tag} className="px-2 py-0.5 text-xs font-medium rounded border border-theme/20 text-theme-muted bg-theme/5"># {tag}</span>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 mb-6">{selectedQ.tags.map((tag) => (<Badge key={tag} variant="neutral">{tag}</Badge>))}</div>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="flex-1 p-8 max-w-2xl relative">
+                <div className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed mb-8">
+                  <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
+                </div>
 
                 {/* Hint display */}
                 {currentHint && (
-                  <div className="glass-card p-4 mb-4 border-accent-amber/20 bg-accent-amber/5 animate-slide-up">
-                    <div className="flex items-start gap-2">
-                      <span className="text-lg">💡</span>
-                      <div>
-                        <p className="text-xs font-semibold text-accent-amber mb-1">Hint Level {hintsUsed}</p>
-                        <p className="text-sm text-surface-300">{currentHint}</p>
+                  <div className="glass-card p-5 mb-8 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 animate-scale-in shadow-xl shadow-amber-500/5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-500 shadow-inner">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2v1"/><path d="M12 15v1"/><path d="M4 12V6a8 8 0 0 1 16 0v6c0 2-1 3-2 5H6c-1-2-2-3-2-5Z"/></svg>
+                      </div>
+                      <div className="flex-1 mt-0.5">
+                        <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Hint Level {hintsUsed}</p>
+                        <p className="text-sm text-theme-secondary font-medium leading-relaxed">{currentHint}</p>
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 mb-6">
-                  <Button variant="secondary" size="sm" icon={<span>📖</span>}>Read Topics</Button>
-                  <Button variant="secondary" size="sm" icon={<span>💡</span>} onClick={handleGetHint} disabled={hintsUsed >= 3}>Hint ({hintsUsed}/3)</Button>
+                {/* Action Bar */}
+                <div className="flex items-center flex-wrap gap-3 mb-8 p-4 rounded-2xl bg-theme-elevated/40 border border-theme/20 backdrop-blur-xl">
+                  <Button variant="secondary" onClick={() => navigate('/topics')} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
+                    <span className="mr-2">📖</span> Review Topics
+                  </Button>
+                  <Button variant="secondary" onClick={handleGetHint} disabled={hintsUsed >= (selectedQ.hints?.length || 0)} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
+                    <span className="mr-2">💡</span> Need a Hint? ({hintsUsed}/{selectedQ.hints?.length || 0})
+                  </Button>
+                  
+                  <div className="flex-1"></div>
+                  
                   {!isSessionActive ? (
-                    <Button variant="primary" size="sm" icon={<span>▶</span>} onClick={handleStartSolving}>Start Solving</Button>
+                    <Button variant="primary" onClick={handleStartSolving} className="shrink-0 shadow-lg shadow-brand-500/20">
+                      <span className="mr-2">▶</span> Begin Session
+                    </Button>
                   ) : (
-                    <Button variant="primary" size="sm" icon={<span>⭐</span>} onClick={() => setShowRating(true)}>Rate My Design</Button>
+                    <Button variant="primary" onClick={handleRateDesign} loading={isRating} className="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 border-none shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
+                      <span className="mr-2">⭐</span> Evaluate My Design
+                    </Button>
                   )}
                 </div>
 
                 {/* Voice Panel */}
                 {isSessionActive && (
-                  <div className="mb-6 animate-slide-up">
+                  <div className="mb-8 animate-slide-up">
                     <VoicePanel onTranscriptReady={handleTranscriptReady} />
                   </div>
                 )}
 
                 {/* AI Chat */}
-                <div className="border-t border-surface-800/50 pt-6">
+                <div className="mb-20">
                   <AiChatPanel sessionId={null} questionTitle={selectedQ.title} />
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center animate-fade-in">
-                <div className="text-5xl mb-4">📋</div>
-                <h3 className="text-lg font-semibold text-surface-200 mb-2">Select a question</h3>
-                <p className="text-sm text-surface-500 max-w-xs">Browse the questions in the sidebar and select one to begin your practice session.</p>
+            <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-grid-pattern opacity-[0.02]" />
+              <div className="absolute w-[800px] h-[800px] bg-brand-500/5 rounded-full blur-3xl" />
+              
+              <div className="text-center animate-fade-in relative z-10 glass-card p-10 max-w-md">
+                <div className="w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-theme-elevated to-theme/50 border border-theme/20 flex items-center justify-center mb-6 shadow-xl">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-theme-muted"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <h3 className="text-xl font-bold text-theme mb-3">Ready to Practice?</h3>
+                <p className="text-sm text-theme-muted leading-relaxed mb-6">
+                  Select a question from the sidebar to begin. Your session will be evaluated by our AI engine for architecture, correctness, and clarity.
+                </p>
+                <Button variant="primary" onClick={() => {
+                  const firstQ = Object.values(groupedQuestions).flat()[0];
+                  if (firstQ) onQuestionSelect(firstQ._id);
+                }}>
+                  Start First Question
+                </Button>
               </div>
             </div>
           )}
         </div>
 
         {/* RIGHT: Whiteboard */}
-        <div className="w-[40%] border-l border-surface-800/50 bg-surface-900/30 flex flex-col flex-shrink-0">
-          <div className="h-12 border-b border-surface-800/50 flex items-center justify-between px-4">
-            <span className="text-xs font-medium text-surface-400">Whiteboard</span>
+        <div className="w-[45%] flex flex-col flex-shrink-0 transition-colors relative bg-theme-elevated">
+          <div className="absolute left-0 inset-y-0 w-px bg-gradient-to-b from-transparent via-theme/30 to-transparent z-10" />
+          
+          <div className="h-14 border-b border-theme/30 flex items-center justify-between px-6 bg-theme/50 backdrop-blur-md">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setShowVoice(!showVoice)}>🎤 Explain</Button>
-              <Button variant="primary" size="sm" onClick={() => setShowRating(true)} disabled={!isSessionActive}>⭐ Rate Design</Button>
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-xs font-bold uppercase tracking-widest text-theme-muted">Canvas</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => setShowVoice(!showVoice)} className="text-xs">
+                <span className="mr-2">🎤</span> Explain
+              </Button>
             </div>
           </div>
-          <div className="flex-1 flex items-center justify-center bg-white/[0.02]">
-            {isSessionActive ? (
-              <div className="text-center p-6">
-                <div className="w-full max-w-sm mx-auto glass-card p-6">
-                  <div className="text-4xl mb-3">🎨</div>
-                  <h4 className="text-sm font-medium text-surface-200 mb-2">Draw Your Design</h4>
-                  <p className="text-xs text-surface-500 mb-4">Excalidraw canvas loads here. Draw your system architecture diagram — boxes, arrows, labels for all components.</p>
-                  <div className="grid grid-cols-4 gap-2 mb-4">{['📦 Service', '🗄️ DB', '💾 Cache', '⚡ Queue', '🌐 LB', '📡 CDN', '👤 Client', '🔒 Auth'].map((item) => (
-                    <div key={item} className="bg-surface-800/50 rounded-md px-2 py-1.5 text-2xs text-surface-400 text-center hover:bg-surface-700/50 cursor-pointer transition-colors">{item}</div>
-                  ))}</div>
-                </div>
-              </div>
+          
+          <div className="flex-1 flex items-center justify-center relative p-4 bg-[#0a0d14]">
+            {isSessionActive && selectedQ ? (
+              <Whiteboard track={currentTrack} />
             ) : (
-              <div className="text-center animate-fade-in">
-                <div className="text-4xl mb-3">✏️</div>
-                <h4 className="text-sm font-medium text-surface-300 mb-1">Excalidraw Whiteboard</h4>
-                <p className="text-xs text-surface-500 max-w-xs">Select a question and click "Start Solving" to begin drawing your system design.</p>
+              <div className="w-full h-full rounded-2xl border border-theme/10 bg-theme/5 flex items-center justify-center relative overflow-hidden backdrop-blur-sm">
+                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, rgba(255,255,255,0.03) 1px, transparent 0)', backgroundSize: '30px 30px' }} />
+                <div className="text-center animate-fade-in z-10 p-8 glass-card border border-theme/20 shadow-2xl max-w-sm relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-500 to-indigo-500" />
+                  <div className="text-5xl mb-4 opacity-80">🎨</div>
+                  <h4 className="text-lg font-bold text-theme mb-2">Canvas Locked</h4>
+                  <p className="text-sm text-theme-muted">Select a problem and begin your session to unlock the interactive whiteboard.</p>
+                </div>
               </div>
             )}
           </div>
@@ -253,13 +376,15 @@ export const PracticePage: FC = () => {
       </div>
 
       {/* Rating Modal */}
-      <RatingModal
-        isOpen={showRating}
-        onClose={() => setShowRating(false)}
-        rating={MOCK_RATING}
-        onStudyTopic={() => { setShowRating(false); }}
-        onTryAnother={() => { setShowRating(false); setSelectedQuestion(null); setIsSessionActive(false); }}
-      />
+      {ratingData && (
+        <RatingModal
+          isOpen={showRating}
+          onClose={() => setShowRating(false)}
+          rating={ratingData}
+          onStudyTopic={() => { setShowRating(false); navigate('/topics'); }}
+          onTryAnother={() => { setShowRating(false); navigate('/practice'); setIsSessionActive(false); }}
+        />
+      )}
     </div>
   );
 };

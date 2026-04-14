@@ -47,6 +47,13 @@ export class CreateQuestionDto {
   @IsBoolean()
   @IsOptional()
   isPublished?: boolean;
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsString()
+  @IsOptional()
+  reviewNotes?: string;
 }
 
 export class UpdateQuestionDto {
@@ -94,6 +101,14 @@ export class UpdateQuestionDto {
   @IsBoolean()
   @IsOptional()
   isPublished?: boolean;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
+
+  @IsString()
+  @IsOptional()
+  reviewNotes?: string;
 }
 
 export class QueryQuestionsDto {
@@ -118,4 +133,8 @@ export class QueryQuestionsDto {
   @IsNumber()
   @IsOptional()
   limit?: number;
+
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

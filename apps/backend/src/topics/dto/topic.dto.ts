@@ -12,6 +12,8 @@ export class CreateTopicDto {
   @IsNumber() @IsOptional() order?: number;
   @IsNumber() @IsOptional() estimatedReadMinutes?: number;
   @IsBoolean() @IsOptional() isPublished?: boolean;
+  @IsString() @IsOptional() status?: string;
+  @IsString() @IsOptional() reviewNotes?: string;
 }
 
 export class UpdateTopicDto {
@@ -25,6 +27,8 @@ export class UpdateTopicDto {
   @IsNumber() @IsOptional() order?: number;
   @IsNumber() @IsOptional() estimatedReadMinutes?: number;
   @IsBoolean() @IsOptional() isPublished?: boolean;
+  @IsString() @IsOptional() status?: string;
+  @IsString() @IsOptional() reviewNotes?: string;
 }
 
 export class QueryTopicsDto {
@@ -32,4 +36,5 @@ export class QueryTopicsDto {
   @IsString() @IsOptional() category?: string;
   @IsNumber() @IsOptional() page?: number;
   @IsNumber() @IsOptional() limit?: number;
+  @IsString() @IsOptional() status?: string;
 }

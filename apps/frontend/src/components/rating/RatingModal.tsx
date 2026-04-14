@@ -58,7 +58,7 @@ export const RatingModal: FC<RatingModalProps> = ({ isOpen, onClose, rating, onS
           <div className="text-center">
             <div className="inline-flex items-center justify-center w-24 h-24 rounded-full border-4 border-brand-500/30 mb-3">
               <div>
-                <span className="text-3xl font-bold text-gradient-brand">{rating.overall.toFixed(1)}</span>
+                <span className="text-3xl font-bold text-gradient-brand">{(rating.overall ?? 0).toFixed(1)}</span>
                 <span className="text-surface-500 text-sm block">/ 10</span>
               </div>
             </div>
@@ -67,15 +67,15 @@ export const RatingModal: FC<RatingModalProps> = ({ isOpen, onClose, rating, onS
 
           {/* Dimension scores */}
           <div className="space-y-3">
-            <ScoreBar label="Scalability" score={rating.scalability} />
-            <ScoreBar label="Correctness" score={rating.correctness} />
-            <ScoreBar label="Completeness" score={rating.completeness} />
-            <ScoreBar label="Clarity" score={rating.clarity} />
-            <ScoreBar label="Voice Quality" score={rating.voiceScore} />
+            <ScoreBar label="Scalability" score={rating.scalability ?? 0} />
+            <ScoreBar label="Correctness" score={rating.correctness ?? 0} />
+            <ScoreBar label="Completeness" score={rating.completeness ?? 0} />
+            <ScoreBar label="Clarity" score={rating.clarity ?? 0} />
+            <ScoreBar label="Voice Quality" score={rating.voiceScore ?? 0} />
           </div>
 
           {/* Strengths */}
-          {rating.strengths.length > 0 && (
+          {(rating.strengths?.length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-accent-emerald mb-2 flex items-center gap-2">
                 <span>✓</span> Strengths
@@ -92,7 +92,7 @@ export const RatingModal: FC<RatingModalProps> = ({ isOpen, onClose, rating, onS
           )}
 
           {/* Improvements */}
-          {rating.improvements.length > 0 && (
+          {(rating.improvements?.length ?? 0) > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-accent-amber mb-2 flex items-center gap-2">
                 <span>△</span> Improvements

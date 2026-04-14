@@ -14,7 +14,7 @@ export class QuestionsService {
 
   async findAll(query: QueryQuestionsDto) {
     const { track, difficulty, search, page = 1, limit = 20 } = query;
-    const filter: any = { isPublished: true };
+    const filter: any = {};
 
     if (track) filter.track = track;
     if (difficulty) filter.difficulty = difficulty;
@@ -25,10 +25,15 @@ export class QuestionsService {
         { tags: { $elemMatch: { $regex: search, $options: 'i' } } },
       ];
     }
+    
+    // Support filtering by exact status if needed
+    if ((query as any).status && (query as any).status !== 'ALL') {
+        filter.status = (query as any).status;
+    }
 
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
-      this.questionModel.find(filter).skip(skip).limit(limit).sort({ difficulty: 1 }).lean(),
+      this.questionModel.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }).lean(),
       this.questionModel.countDocuments(filter),
     ]);
 
@@ -45,9 +50,10 @@ export class QuestionsService {
   }
 
   async findGrouped() {
+    // Legacy support: fetch LIVE statuses, or if still using old isPublished logic, handle that too.
     const questions = await this.questionModel
-      .find({ isPublished: true })
-      .select('title track difficulty tags attemptCount avgScore')
+      .find({ $or: [{ status: 'LIVE' }, { isPublished: true }] })
+      .select('title track difficulty tags attemptCount avgScore status')
       .sort({ track: 1, difficulty: 1 })
       .lean();
 

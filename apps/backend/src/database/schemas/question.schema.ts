@@ -70,8 +70,11 @@ export class Question {
   @Prop()
   sampleAnswerOutline: string;
 
-  @Prop({ default: true })
-  isPublished: boolean;
+  @Prop({ required: true, enum: ['DRAFT', 'PENDING', 'LIVE'], default: 'DRAFT' })
+  status: string;
+
+  @Prop()
+  reviewNotes: string;
 
   @Prop({ type: [String], default: [] })
   tags: string[];
@@ -89,6 +92,6 @@ export const QuestionSchema = SchemaFactory.createForClass(Question);
 // Indexes
 QuestionSchema.index({ track: 1 });
 QuestionSchema.index({ difficulty: 1 });
-QuestionSchema.index({ isPublished: 1 });
+QuestionSchema.index({ status: 1 });
 QuestionSchema.index({ tags: 1 });
 QuestionSchema.index({ title: 'text', description: 'text' });
