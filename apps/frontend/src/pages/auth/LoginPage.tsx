@@ -1,17 +1,48 @@
 import { type FC, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
+import { authApi } from '@/api/auth.api';
+import { useAuthStore } from '@/store/authStore';
 
 export const LoginPage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated, setAuth } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
-  const handleDemoLogin = () => {
+  const redirectTo = (location.state as { from?: string } | null)?.from || '/dashboard';
+
+  if (isAuthenticated) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError('Email and password are required.');
+      return;
+    }
+
     setIsLoading(true);
-    // Simulate login for demo — will be replaced with real OAuth
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 1000);
+    setError('');
+
+    try {
+      const response = mode === 'register'
+        ? await authApi.register(email.trim(), password, name.trim() || undefined)
+        : await authApi.login(email.trim(), password);
+
+      const { accessToken, user } = response.data.data;
+      setAuth(user, accessToken);
+      navigate(redirectTo, { replace: true });
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || 'Authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -65,7 +96,7 @@ export const LoginPage: FC = () => {
           {/* OAuth buttons */}
           <div className="space-y-3 mb-6">
             <button
-              onClick={handleDemoLogin}
+              onClick={() => setError('OAuth is not wired yet. Use email/password sign in below.')}
               className="w-full flex items-center justify-center gap-3 px-5 py-3 bg-white hover:bg-gray-50 text-gray-800 font-medium text-sm rounded-lg transition-all duration-200 hover:shadow-lg hover:shadow-white/5"
             >
               <svg width="18" height="18" viewBox="0 0 24 24">
@@ -78,7 +109,7 @@ export const LoginPage: FC = () => {
             </button>
 
             <button
-              onClick={handleDemoLogin}
+              onClick={() => setError('OAuth is not wired yet. Use email/password sign in below.')}
               className="w-full flex items-center justify-center gap-3 px-5 py-3 bg-surface-800 hover:bg-surface-700 text-surface-100 font-medium text-sm rounded-lg border border-surface-600/50 transition-all duration-200"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -99,6 +130,33 @@ export const LoginPage: FC = () => {
 
           {/* Email form */}
           <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-900/60 p-1">
+              <button
+                onClick={() => setMode('login')}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${mode === 'login' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-surface-200'}`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => setMode('register')}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${mode === 'register' ? 'bg-brand-600 text-white' : 'text-surface-400 hover:text-surface-200'}`}
+              >
+                Create Account
+              </button>
+            </div>
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-medium text-surface-400 mb-1.5" htmlFor="login-name">Name</label>
+                <input
+                  id="login-name"
+                  type="text"
+                  placeholder="Your name"
+                  className="input-field"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-surface-400 mb-1.5" htmlFor="login-email">Email</label>
               <input
@@ -106,6 +164,8 @@ export const LoginPage: FC = () => {
                 type="email"
                 placeholder="you@company.com"
                 className="input-field"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
@@ -115,15 +175,21 @@ export const LoginPage: FC = () => {
                 type="password"
                 placeholder="••••••••"
                 className="input-field"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmit();
+                }}
               />
             </div>
+            {error && <p className="text-sm text-rose-400">{error}</p>}
             <Button
               variant="primary"
               className="w-full"
               loading={isLoading}
-              onClick={handleDemoLogin}
+              onClick={handleSubmit}
             >
-              Sign In
+              {mode === 'register' ? 'Create Account' : 'Sign In'}
             </Button>
           </div>
         </div>

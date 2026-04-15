@@ -30,6 +30,11 @@ client.interceptors.response.use(
           {},
           { withCredentials: true }
         );
+        if (!data.data.accessToken) {
+          useAuthStore.getState().logout();
+          window.location.href = '/login';
+          return Promise.reject(err);
+        }
         useAuthStore.getState().setToken(data.data.accessToken);
         err.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
         return client(err.config);

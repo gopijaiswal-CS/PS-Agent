@@ -2,7 +2,7 @@ import client from './client';
 import type { ApiResponse, Topic } from '@/types';
 
 export const topicsApi = {
-  getAll: (params?: { track?: string; category?: string; page?: number }) =>
+  getAll: (params?: { track?: string; category?: string; page?: number; limit?: number; status?: string }) =>
     client.get<ApiResponse<Topic[]>>('/api/topics', { params }),
 
   getById: (id: string) =>

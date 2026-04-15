@@ -37,7 +37,9 @@ export interface Question {
   hints: string[];
   timeLimitSeconds: number;
   sampleAnswerOutline?: string;
-  isPublished: boolean;
+  isPublished?: boolean;
+  status: 'DRAFT' | 'PENDING' | 'LIVE';
+  reviewNotes?: string;
   tags: string[];
   attemptCount: number;
   avgScore: number;

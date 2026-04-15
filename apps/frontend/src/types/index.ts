@@ -37,7 +37,7 @@ export interface Question {
   hints: string[];
   timeLimitSeconds: number;
   sampleAnswerOutline?: string;
-  isPublished: boolean;
+  isPublished?: boolean;
   status: string;
   reviewNotes?: string;
   tags: string[];
@@ -60,7 +60,7 @@ export interface Topic {
   nextTopics: string[];
   order: number;
   estimatedReadMinutes: number;
-  isPublished: boolean;
+  isPublished?: boolean;
   status: string;
   reviewNotes?: string;
   createdAt: string;

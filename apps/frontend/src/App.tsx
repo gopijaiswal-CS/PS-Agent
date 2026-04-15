@@ -16,14 +16,43 @@ import { PrivateRoute, AdminRoute } from '@/components/auth/PrivateRoute';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
+import { authApi } from '@/api/auth.api';
 
 function App() {
-  // const { refreshAuth } = useAuthStore();
+  const { setAuth, setToken, logout, setLoading } = useAuthStore();
   const theme = useUiStore(state => state.theme);
 
-  // useEffect(() => {
-  //   refreshAuth();
-  // }, [refreshAuth]);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function bootstrapAuth() {
+      setLoading(true);
+      try {
+        const refreshRes = await authApi.refresh();
+        const accessToken = refreshRes.data.data.accessToken;
+
+        if (!accessToken) {
+          if (!cancelled) logout();
+          return;
+        }
+
+        setToken(accessToken);
+        const meRes = await authApi.getMe();
+
+        if (!cancelled) {
+          setAuth(meRes.data.data, accessToken);
+        }
+      } catch {
+        if (!cancelled) logout();
+      }
+    }
+
+    bootstrapAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [logout, setAuth, setLoading, setToken]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);

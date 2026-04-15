@@ -6,7 +6,7 @@ import { UserDocument } from './schemas/user.schema';
 import { QuestionDocument } from './schemas/question.schema';
 import { TopicDocument } from './schemas/topic.schema';
 import { SessionDocument } from './schemas/session.schema';
-import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 async function bootstrap() {
   console.log('🌱 Starting database seed...');
@@ -24,8 +24,7 @@ async function bootstrap() {
   await sessionModel.deleteMany({});
 
   console.log('👤 Creating users...');
-  const salt = await bcrypt.genSalt();
-  const hashedPassword = await bcrypt.hash('password123', salt);
+  const hashedPassword = crypto.createHash('sha256').update('password123').digest('hex');
   
   await userModel.create([
     {

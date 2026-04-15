@@ -8,6 +8,15 @@ export default {
   theme: {
     extend: {
       colors: {
+        theme: {
+          bg: 'rgb(var(--theme-bg-primary) / <alpha-value>)',
+          elevated: 'rgb(var(--theme-bg-elevated) / <alpha-value>)',
+          border: 'rgb(var(--theme-border) / <alpha-value>)',
+          secondary: 'rgb(var(--theme-text-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--theme-text-muted) / <alpha-value>)',
+          accent: 'rgb(var(--theme-accent) / <alpha-value>)',
+          'accent-secondary': 'rgb(var(--theme-accent-secondary) / <alpha-value>)',
+        },
         brand: {
           50: '#eef2ff',
           100: '#e0e7ff',

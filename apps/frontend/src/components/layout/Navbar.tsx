@@ -4,13 +4,14 @@ import { Badge } from '@/components/ui/Badge';
 import { useUiStore, type AppTheme } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authStore';
 import { formatRelativeTime } from '@/utils/formatTime';
+import { authApi } from '@/api/auth.api';
 
 const THEMES: { id: AppTheme; name: string; colors: string; accent: string }[] = [
-  { id: 'midnight', name: 'Midnight', colors: 'from-indigo-500 to-violet-500', accent: '#818cf8' },
-  { id: 'aurora', name: 'Aurora', colors: 'from-emerald-400 to-cyan-400', accent: '#10b981' },
-  { id: 'ember', name: 'Ember', colors: 'from-orange-400 to-rose-500', accent: '#fb923c' },
-  { id: 'ocean', name: 'Ocean', colors: 'from-sky-400 to-blue-500', accent: '#38bdf8' },
-  { id: 'forest', name: 'Forest', colors: 'from-green-400 to-lime-400', accent: '#4ade80' },
+  { id: 'midnight', name: 'Operator', colors: 'from-cyan-400 to-violet-500', accent: '#70f0ff' },
+  { id: 'aurora', name: 'Neon Terminal', colors: 'from-emerald-300 to-cyan-400', accent: '#43e9c7' },
+  { id: 'ember', name: 'Incident', colors: 'from-orange-400 to-amber-300', accent: '#ff7849' },
+  { id: 'ocean', name: 'Deep Stack', colors: 'from-sky-400 to-cyan-300', accent: '#4ea8ff' },
+  { id: 'forest', name: 'Kernel', colors: 'from-green-400 to-lime-300', accent: '#6cff96' },
 ];
 
 const NAV_LINKS = [
@@ -182,7 +183,7 @@ export const Navbar: FC = () => {
                     </div>
                   </div>
                   <div className="border-t border-theme my-1 sm:hidden" />
-                  <button onClick={() => { logout(); setProfileDropdownOpen(false); navigate('/login'); }} className="w-full text-left px-3 py-2 text-sm rounded-md text-rose-400 hover:bg-rose-500/10 transition-colors">🚪 Log out</button>
+                  <button onClick={async () => { try { await authApi.logout(); } catch {} logout(); setProfileDropdownOpen(false); navigate('/login'); }} className="w-full text-left px-3 py-2 text-sm rounded-md text-rose-400 hover:bg-rose-500/10 transition-colors">🚪 Log out</button>
                 </div>
               </div>
             )}

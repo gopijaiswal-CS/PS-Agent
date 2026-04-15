@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { User, UserDocument } from '../database/schemas/user.schema';
 
 @Injectable()
@@ -40,9 +41,14 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    const isValidPassword = await this.validatePassword(password, user.password);
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const hashedPassword = this.hashPassword(password);
     if (user.password !== hashedPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      user.password = hashedPassword;
     }
 
     user.lastActiveAt = new Date();
@@ -142,6 +148,21 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private async validatePassword(password: string, storedPassword: string): Promise<boolean> {
+    if (!storedPassword) return false;
+
+    const hashedPassword = this.hashPassword(password);
+    if (storedPassword === hashedPassword) {
+      return true;
+    }
+
+    if (storedPassword.startsWith('$2')) {
+      return bcrypt.compare(password, storedPassword);
+    }
+
+    return false;
   }
 
   private sanitizeUser(user: any) {

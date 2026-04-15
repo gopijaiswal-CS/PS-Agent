@@ -26,9 +26,10 @@ export class QuestionsService {
       ];
     }
     
-    // Support filtering by exact status if needed
-    if ((query as any).status && (query as any).status !== 'ALL') {
-        filter.status = (query as any).status;
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status;
+    } else if (!query.status) {
+      filter.$or = [{ status: 'LIVE' }, { isPublished: true }];
     }
 
     const skip = (page - 1) * limit;
@@ -50,7 +51,6 @@ export class QuestionsService {
   }
 
   async findGrouped() {
-    // Legacy support: fetch LIVE statuses, or if still using old isPublished logic, handle that too.
     const questions = await this.questionModel
       .find({ $or: [{ status: 'LIVE' }, { isPublished: true }] })
       .select('title track difficulty tags attemptCount avgScore status')

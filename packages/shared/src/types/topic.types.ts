@@ -11,7 +11,9 @@ export interface Topic {
   nextTopics: string[];
   order: number;
   estimatedReadMinutes?: number;
-  isPublished: boolean;
+  isPublished?: boolean;
+  status: 'DRAFT' | 'PENDING' | 'LIVE';
+  reviewNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

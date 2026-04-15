@@ -20,7 +20,7 @@ export const QuestionEditor: FC = () => {
   const loadQuestions = async () => {
     setLoading(true);
     try {
-      const res = await questionsApi.getAll({ limit: 100 });
+      const res = await questionsApi.getAll({ limit: 100, status: 'ALL' });
       setQuestions(res.data.data);
     } catch (err) {
       console.error('Failed to load questions:', err);

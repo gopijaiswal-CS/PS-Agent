@@ -44,7 +44,7 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(200)
   async refresh(@Req() req: any, @Res({ passthrough: true }) res: any) {
-    const refreshToken = req.cookies?.refreshToken;
+    const refreshToken = this.getRefreshTokenFromRequest(req);
     if (!refreshToken) {
       return { accessToken: null };
     }
@@ -74,5 +74,24 @@ export class AuthController {
       sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+  }
+
+  private getRefreshTokenFromRequest(req: Request): string | null {
+    if ((req as any).cookies?.refreshToken) {
+      return (req as any).cookies.refreshToken;
+    }
+
+    const cookieHeader = req.headers?.cookie;
+    if (!cookieHeader) return null;
+
+    const cookies = cookieHeader.split(';');
+    for (const cookie of cookies) {
+      const [rawName, ...rawValue] = cookie.trim().split('=');
+      if (rawName === 'refreshToken') {
+        return decodeURIComponent(rawValue.join('='));
+      }
+    }
+
+    return null;
   }
 }

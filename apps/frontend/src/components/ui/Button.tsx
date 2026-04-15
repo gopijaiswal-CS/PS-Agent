@@ -16,6 +16,7 @@ export const Button: FC<ButtonProps> = ({
   children,
   className,
   disabled,
+  type = 'button',
   ...props
 }) => {
   const variants = {
@@ -33,6 +34,7 @@ export const Button: FC<ButtonProps> = ({
 
   return (
     <button
+      type={type}
       className={cn(variants[variant], sizes[size], className)}
       disabled={disabled || loading}
       {...props}
