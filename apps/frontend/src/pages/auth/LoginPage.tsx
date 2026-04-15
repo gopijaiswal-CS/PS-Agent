@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 export const LoginPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated, isLoading: authBootstrapping, setAuth } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
@@ -15,7 +15,24 @@ export const LoginPage: FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const redirectTo = (location.state as { from?: string } | null)?.from || '/dashboard';
+  const from = (location.state as { from?: string } | null)?.from;
+  const redirectTo =
+    from && from !== '/login' && from.startsWith('/') ? from : '/dashboard';
+
+  if (authBootstrapping) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-theme">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-12 h-12 rounded-xl bg-brand-600/30 flex items-center justify-center">
+            <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+              <path d="M16 2L28 9V23L16 30L4 23V9L16 2Z" fill="#818cf8" />
+            </svg>
+          </div>
+          <p className="text-sm text-theme-muted font-medium">Loading…</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     return <Navigate to={redirectTo} replace />;

@@ -13,7 +13,7 @@ import { AnalyticsPage } from '@/pages/admin/AnalyticsPage';
 import { ApprovalQueue } from '@/pages/admin/ApprovalQueue';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { PrivateRoute, AdminRoute } from '@/components/auth/PrivateRoute';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
 import { authApi } from '@/api/auth.api';
@@ -21,36 +21,38 @@ import { authApi } from '@/api/auth.api';
 function App() {
   const { setAuth, setToken, logout, setLoading } = useAuthStore();
   const theme = useUiStore(state => state.theme);
+  const authBootstrapGen = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const myGen = ++authBootstrapGen.current;
+    setLoading(true);
 
-    async function bootstrapAuth() {
-      setLoading(true);
+    (async () => {
       try {
         const refreshRes = await authApi.refresh();
         const accessToken = refreshRes.data.data.accessToken;
 
         if (!accessToken) {
-          if (!cancelled) logout();
+          if (authBootstrapGen.current === myGen) logout();
           return;
         }
 
         setToken(accessToken);
         const meRes = await authApi.getMe();
 
-        if (!cancelled) {
+        if (authBootstrapGen.current === myGen) {
           setAuth(meRes.data.data, accessToken);
         }
       } catch {
-        if (!cancelled) logout();
+        if (authBootstrapGen.current === myGen) logout();
+      } finally {
+        // Only the latest bootstrap pass may clear loading (avoids StrictMode stale runs leaving isLoading stuck)
+        if (authBootstrapGen.current === myGen) setLoading(false);
       }
-    }
-
-    bootstrapAuth();
+    })();
 
     return () => {
-      cancelled = true;
+      authBootstrapGen.current += 1;
     };
   }, [logout, setAuth, setLoading, setToken]);
 

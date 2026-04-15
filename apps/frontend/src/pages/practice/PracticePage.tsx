@@ -1,5 +1,5 @@
 import { type FC, useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Timer } from '@/components/ui/Timer';
@@ -7,6 +7,8 @@ import { AiChatPanel } from '@/components/chat/AiChatPanel';
 import { VoicePanel } from '@/components/voice/VoicePanel';
 import { RatingModal } from '@/components/rating/RatingModal';
 import { Whiteboard } from '@/components/ui/Whiteboard';
+import { CodeWorkspace } from '@/components/ui/CodeWorkspace';
+import { ClassDesignWorkspace } from '@/components/ui/ClassDesignWorkspace';
 import { questionsApi } from '@/api/questions.api';
 import type { Question, AiRating } from '@/types';
 import { sessionsApi } from '@/api/sessions.api';
@@ -38,7 +40,9 @@ const DifficultyDots: FC<{ level: number }> = ({ level }) => (
 
 export const PracticePage: FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { questionId } = useParams<{ questionId?: string }>();
+  const routeState = location.state as { trackId?: string; selectedQuestionId?: string } | null;
   
   const [groupedQuestions, setGroupedQuestions] = useState<Record<string, Question[]>>({});
   const [sidebarSearch, setSidebarSearch] = useState('');
@@ -81,7 +85,9 @@ export const PracticePage: FC = () => {
     return null;
   }, [questionId, groupedQuestions]);
 
-  const currentTrack = selectedQ?.track || 'hld';
+  const activeTrack = routeState?.trackId || selectedQ?.track || 'hld';
+  const visibleQuestions = groupedQuestions[activeTrack] || [];
+  const selectedTrackLabel = TRACK_LABELS[activeTrack]?.name || 'Selected Track';
 
   const handleStartSolving = useCallback(async () => {
     if (!selectedQ) return;
@@ -131,11 +137,20 @@ export const PracticePage: FC = () => {
   };
 
   const onQuestionSelect = (id: string) => {
-    navigate(`/practice/q/${id}`);
+    navigate(`/practice/q/${id}`, { state: { trackId: activeTrack } });
     setIsSessionActive(false);
     setCurrentHint(null);
     setHintsUsed(0);
   };
+
+  useEffect(() => {
+    if (!questionId && routeState?.selectedQuestionId) {
+      navigate(`/practice/q/${routeState.selectedQuestionId}`, {
+        replace: true,
+        state: { trackId: routeState.trackId },
+      });
+    }
+  }, [navigate, questionId, routeState]);
 
   return (
     <div className="h-full flex flex-col bg-surface-950">
@@ -145,6 +160,9 @@ export const PracticePage: FC = () => {
           <div className="flex items-center gap-3">
              <span className="text-sm font-semibold text-theme">
                Interactive Practice
+             </span>
+             <span className="text-xs text-theme-muted hidden sm:inline">
+               {selectedTrackLabel}
              </span>
           </div>
           <div className="flex items-center gap-3">
@@ -173,8 +191,16 @@ export const PracticePage: FC = () => {
             </div>
           </div>
           
+          <div className="px-4 py-3 border-b border-theme/20 bg-theme/20">
+            <p className="text-2xs uppercase tracking-[0.24em] text-theme-muted mb-1">Focused Track</p>
+            <h3 className="text-sm font-semibold text-theme">{selectedTrackLabel}</h3>
+            <p className="text-xs text-theme-muted mt-1">
+              Browse only the questions for this category while you practice.
+            </p>
+          </div>
+
           <div className="flex-1 overflow-y-auto px-3 py-4 custom-scrollbar">
-            {Object.entries(groupedQuestions).map(([track, questions]) => {
+            {Object.entries(groupedQuestions).filter(([track]) => track === activeTrack).map(([track, questions]) => {
               const trackInfo = TRACK_LABELS[track];
               const filteredQs = questions.filter((q) => q.title.toLowerCase().includes(sidebarSearch.toLowerCase()));
               if (filteredQs.length === 0 && sidebarSearch) return null;
@@ -236,7 +262,7 @@ export const PracticePage: FC = () => {
               {/* Custom header area with gradient background */}
               <div className="relative pt-8 pb-6 px-8 border-b border-theme/10">
                 <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-transparent pointer-events-none" />
-                <div className="relative max-w-2xl">
+                <div className="relative max-w-4xl">
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-3 mb-4 flex-wrap">
@@ -251,6 +277,9 @@ export const PracticePage: FC = () => {
                         </span>
                       </div>
                       <h2 className="text-3xl font-extrabold text-theme tracking-tight leading-tight">{selectedQ.title}</h2>
+                      <p className="text-sm text-theme-muted mt-3 max-w-2xl">
+                        Read the full prompt, sketch on the canvas, then start the session when you are ready to talk through the solution.
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-4">
@@ -262,58 +291,69 @@ export const PracticePage: FC = () => {
               </div>
 
               {/* Main Content Area */}
-              <div className="flex-1 p-8 max-w-2xl relative">
-                <div className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed mb-8">
-                  <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
-                </div>
-
-                {/* Hint display */}
-                {currentHint && (
-                  <div className="glass-card p-5 mb-8 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 animate-scale-in shadow-xl shadow-amber-500/5">
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-500 shadow-inner">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2v1"/><path d="M12 15v1"/><path d="M4 12V6a8 8 0 0 1 16 0v6c0 2-1 3-2 5H6c-1-2-2-3-2-5Z"/></svg>
+              <div className="flex-1 p-8 relative">
+                <div className="max-w-4xl">
+                  <div className="glass-card p-6 md:p-8 mb-8 border border-theme/20 shadow-xl">
+                    <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
+                      <div>
+                        <p className="text-2xs uppercase tracking-[0.22em] text-theme-muted mb-1">Question Brief</p>
+                        <h3 className="text-lg font-semibold text-theme">What you need to solve</h3>
                       </div>
-                      <div className="flex-1 mt-0.5">
-                        <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Hint Level {hintsUsed}</p>
-                        <p className="text-sm text-theme-secondary font-medium leading-relaxed">{currentHint}</p>
-                      </div>
+                      <Badge variant="neutral">{selectedTrackLabel}</Badge>
+                    </div>
+                    <div className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed">
+                      <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
                     </div>
                   </div>
-                )}
 
-                {/* Action Bar */}
-                <div className="flex items-center flex-wrap gap-3 mb-8 p-4 rounded-2xl bg-theme-elevated/40 border border-theme/20 backdrop-blur-xl">
-                  <Button variant="secondary" onClick={() => navigate('/topics')} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
-                    <span className="mr-2">📖</span> Review Topics
-                  </Button>
-                  <Button variant="secondary" onClick={handleGetHint} disabled={hintsUsed >= (selectedQ.hints?.length || 0)} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
-                    <span className="mr-2">💡</span> Need a Hint? ({hintsUsed}/{selectedQ.hints?.length || 0})
-                  </Button>
-                  
-                  <div className="flex-1"></div>
-                  
-                  {!isSessionActive ? (
-                    <Button variant="primary" onClick={handleStartSolving} className="shrink-0 shadow-lg shadow-brand-500/20">
-                      <span className="mr-2">▶</span> Begin Session
-                    </Button>
-                  ) : (
-                    <Button variant="primary" onClick={handleRateDesign} loading={isRating} className="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 border-none shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
-                      <span className="mr-2">⭐</span> Evaluate My Design
-                    </Button>
+                  {/* Hint display */}
+                  {currentHint && (
+                    <div className="glass-card p-5 mb-8 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-amber-500/5 animate-scale-in shadow-xl shadow-amber-500/5">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-500/20 text-amber-500 shadow-inner">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2v1"/><path d="M12 15v1"/><path d="M4 12V6a8 8 0 0 1 16 0v6c0 2-1 3-2 5H6c-1-2-2-3-2-5Z"/></svg>
+                        </div>
+                        <div className="flex-1 mt-0.5">
+                          <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mb-1">Hint Level {hintsUsed}</p>
+                          <p className="text-sm text-theme-secondary font-medium leading-relaxed">{currentHint}</p>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </div>
 
-                {/* Voice Panel */}
-                {isSessionActive && (
-                  <div className="mb-8 animate-slide-up">
-                    <VoicePanel onTranscriptReady={handleTranscriptReady} />
+                  {/* Action Bar */}
+                  <div className="flex items-center flex-wrap gap-3 mb-8 p-4 rounded-2xl bg-theme-elevated/40 border border-theme/20 backdrop-blur-xl">
+                    <Button variant="secondary" onClick={() => navigate('/topics')} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
+                      <span className="mr-2">📖</span> Review Topics
+                    </Button>
+                    <Button variant="secondary" onClick={handleGetHint} disabled={hintsUsed >= (selectedQ.hints?.length || 0)} className="shrink-0 bg-theme-elevated hover:bg-theme/80 border-theme/20">
+                      <span className="mr-2">💡</span> Need a Hint? ({hintsUsed}/{selectedQ.hints?.length || 0})
+                    </Button>
+                    
+                    <div className="flex-1"></div>
+                    
+                    {!isSessionActive ? (
+                      <Button variant="primary" onClick={handleStartSolving} className="shrink-0 shadow-lg shadow-brand-500/20">
+                        <span className="mr-2">▶</span> Begin Session
+                      </Button>
+                    ) : (
+                      <Button variant="primary" onClick={handleRateDesign} loading={isRating} className="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 border-none shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
+                        <span className="mr-2">⭐</span> Evaluate My Design
+                      </Button>
+                    )}
                   </div>
-                )}
 
-                {/* AI Chat */}
-                <div className="mb-20">
-                  <AiChatPanel sessionId={null} questionTitle={selectedQ.title} />
+                  {/* Voice Panel */}
+                  {isSessionActive && (
+                    <div className="mb-8 animate-slide-up">
+                      <VoicePanel onTranscriptReady={handleTranscriptReady} />
+                    </div>
+                  )}
+
+                  {/* AI Chat */}
+                  <div className="mb-20">
+                    <AiChatPanel sessionId={null} questionTitle={selectedQ.title} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -328,10 +368,10 @@ export const PracticePage: FC = () => {
                 </div>
                 <h3 className="text-xl font-bold text-theme mb-3">Ready to Practice?</h3>
                 <p className="text-sm text-theme-muted leading-relaxed mb-6">
-                  Select a question from the sidebar to begin. Your session will be evaluated by our AI engine for architecture, correctness, and clarity.
+                  Select a question from the {selectedTrackLabel.toLowerCase()} list to begin. Your session will be evaluated by our AI engine for architecture, correctness, and clarity.
                 </p>
                 <Button variant="primary" onClick={() => {
-                  const firstQ = Object.values(groupedQuestions).flat()[0];
+                  const firstQ = visibleQuestions[0];
                   if (firstQ) onQuestionSelect(firstQ._id);
                 }}>
                   Start First Question
@@ -348,7 +388,9 @@ export const PracticePage: FC = () => {
           <div className="h-14 border-b border-theme/30 flex items-center justify-between px-6 bg-theme/50 backdrop-blur-md">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-widest text-theme-muted">Canvas</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-theme-muted">
+                {activeTrack === 'dsa' ? 'Code Workspace' : activeTrack === 'lld' ? 'Class Design Studio' : 'Canvas'}
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="sm" onClick={() => setShowVoice(!showVoice)} className="text-xs">
@@ -359,15 +401,30 @@ export const PracticePage: FC = () => {
           
           <div className="flex-1 flex items-center justify-center relative p-4 bg-[#0a0d14]">
             {isSessionActive && selectedQ ? (
-              <Whiteboard track={currentTrack} />
+              activeTrack === 'dsa' ? (
+                <CodeWorkspace question={selectedQ} />
+              ) : activeTrack === 'lld' ? (
+                <ClassDesignWorkspace question={selectedQ} />
+              ) : (
+                <Whiteboard track={activeTrack} />
+              )
+              
             ) : (
               <div className="w-full h-full rounded-2xl border border-theme/10 bg-theme/5 flex items-center justify-center relative overflow-hidden backdrop-blur-sm">
                 <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 10px 10px, rgba(255,255,255,0.03) 1px, transparent 0)', backgroundSize: '30px 30px' }} />
                 <div className="text-center animate-fade-in z-10 p-8 glass-card border border-theme/20 shadow-2xl max-w-sm relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-brand-500 to-indigo-500" />
                   <div className="text-5xl mb-4 opacity-80">🎨</div>
-                  <h4 className="text-lg font-bold text-theme mb-2">Canvas Locked</h4>
-                  <p className="text-sm text-theme-muted">Select a problem and begin your session to unlock the interactive whiteboard.</p>
+                  <h4 className="text-lg font-bold text-theme mb-2">
+                    {activeTrack === 'dsa' ? 'Editor Locked' : activeTrack === 'lld' ? 'Studio Locked' : 'Canvas Locked'}
+                  </h4>
+                  <p className="text-sm text-theme-muted">
+                    {activeTrack === 'dsa'
+                      ? 'Select a DSA problem and begin your session to unlock the coding workspace.'
+                      : activeTrack === 'lld'
+                        ? 'Select an LLD problem and begin your session to unlock the diagram and class design studio.'
+                      : 'Select a problem and begin your session to unlock the interactive whiteboard.'}
+                  </p>
                 </div>
               </div>
             )}
