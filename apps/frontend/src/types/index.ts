@@ -110,3 +110,41 @@ export interface ApiResponse<T> {
     totalPages?: number;
   };
 }
+
+export interface CoachSession {
+  _id: string;
+  userId: string;
+  questionId: string | Question;
+  coachPersona: string;
+  fullTranscript: string;
+  diagramJSON: Record<string, any>;
+  hintsUsed: number;
+  sessionDurationSeconds: number;
+  emotionTimeline: {
+    timestamp: number;
+    emotion: string;
+    confidence: number;
+    eyeContact: number;
+  }[];
+  avgWPM: number;
+  hesitationCount: number;
+  fillerWordCount: number;
+  scores: {
+    technical: number;
+    communication: number;
+    confidence: number;
+    eyeContact: number;
+    paceClarity: number;
+    overall: number;
+  } | null;
+  aiFeedback: {
+    strengths: string[];
+    improvements: string[];
+    coachQuote: string;
+    nextTopicSlug: string;
+  } | null;
+  recordingUrl: string | null;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

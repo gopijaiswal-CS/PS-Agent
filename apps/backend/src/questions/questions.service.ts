@@ -18,18 +18,25 @@ export class QuestionsService {
 
     if (track) filter.track = track;
     if (difficulty) filter.difficulty = difficulty;
-    if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { tags: { $elemMatch: { $regex: search, $options: 'i' } } },
-      ];
-    }
-    
+
+    // Status filter — use $and to avoid clobbering a search $or
     if (query.status && query.status !== 'ALL') {
       filter.status = query.status;
     } else if (!query.status) {
-      filter.$or = [{ status: 'LIVE' }, { isPublished: true }];
+      // Only show LIVE (or legacy isPublished) to public queries
+      const statusCondition = { $or: [{ status: 'LIVE' }, { isPublished: true }] };
+      filter.$and = filter.$and ? [...filter.$and, statusCondition] : [statusCondition];
+    }
+
+    if (search) {
+      const searchCondition = {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } },
+          { tags: { $elemMatch: { $regex: search, $options: 'i' } } },
+        ],
+      };
+      filter.$and = filter.$and ? [...filter.$and, searchCondition] : [searchCondition];
     }
 
     const skip = (page - 1) * limit;

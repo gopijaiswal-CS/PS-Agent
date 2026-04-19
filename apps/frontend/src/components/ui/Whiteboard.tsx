@@ -1,9 +1,7 @@
-import { type FC, useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
-import { createPortal } from 'react-dom';
 
-const Excalidraw = lazy(() =>
-  import('@excalidraw/excalidraw').then((mod) => ({ default: mod.Excalidraw })),
-);
+
+import { type FC, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface WhiteboardProps {
   track: string;
@@ -15,51 +13,13 @@ interface WhiteboardProps {
 
 export const Whiteboard: FC<WhiteboardProps> = ({
   track,
-  initialData,
-  onChange,
   readOnly = false,
   persistenceKey = 'techprep-whiteboard',
 }) => {
   const [showNotes, setShowNotes] = useState(track === 'behavioral');
   const [notes, setNotes] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const excalidrawInitial = useMemo(() => {
-    if (initialData != null) return initialData;
-    try {
-      const raw = localStorage.getItem(persistenceKey);
-      if (!raw) return undefined;
-      return JSON.parse(raw) as { elements?: unknown[]; appState?: Record<string, unknown> };
-    } catch {
-      return undefined;
-    }
-  }, [persistenceKey, initialData]);
-
-  const handleCanvasChange = useCallback(
-    (elements: readonly unknown[], appState: Record<string, unknown>) => {
-      if (readOnly) return;
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        try {
-          const scene = { elements, appState };
-          localStorage.setItem(persistenceKey, JSON.stringify(scene));
-          onChange?.(scene);
-        } catch {
-          /* ignore quota / serialization errors */
-        }
-      }, 350);
-    },
-    [readOnly, persistenceKey, onChange],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
-
-  // If track is behavioral, default to taking interview notes instead of drawing
   useEffect(() => {
     setShowNotes(track === 'behavioral');
   }, [track]);
@@ -106,22 +66,13 @@ export const Whiteboard: FC<WhiteboardProps> = ({
       <div
         className={`absolute inset-2 border border-theme-border/10 overflow-hidden shadow-2xl bg-[#121212] backdrop-blur-3xl transition-all duration-300 ${isMaximized ? 'rounded-none inset-0 border-0' : 'rounded-lg'}`}
       >
-        <div className="h-full w-full min-h-[400px] excalidraw-techprep">
-          <Suspense
-            fallback={
-              <div className="h-full min-h-[400px] flex items-center justify-center text-theme-muted text-sm">
-                Loading canvas…
-              </div>
-            }
-          >
-            <Excalidraw
-              key={persistenceKey}
-              initialData={excalidrawInitial}
-              onChange={handleCanvasChange}
-              viewModeEnabled={readOnly}
-              theme="dark"
-            />
-          </Suspense>
+        <div className="h-full w-full min-h-[400px]">
+           <iframe 
+               src="https://excalidraw.com/"
+               title="Whiteboard"
+               className="w-full h-full border-none filter invert hue-rotate-[180deg]"
+               style={{ minHeight: '400px' }}
+           />
         </div>
       </div>
 

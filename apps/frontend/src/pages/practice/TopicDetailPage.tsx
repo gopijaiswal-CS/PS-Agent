@@ -118,9 +118,19 @@ export const TopicDetailPage: FC = () => {
         <div className="glass-card p-4 mb-8 bg-amber-500/5 border-amber-500/20">
           <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Prerequisites</span>
           <div className="flex flex-wrap gap-2 mt-2">
-            {topic.prerequisites.map((p, i) => (
-              <span key={i} className="px-2.5 py-1 text-xs rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20">{p}</span>
-            ))}
+            {topic.prerequisites.map((p: any, i: number) => {
+              const label = typeof p === 'string' ? p : (p?.name || p?._id?.toString() || 'Unknown');
+              const id = typeof p === 'string' ? null : p?._id?.toString();
+              return (
+                <span
+                  key={id || i}
+                  className={`px-2.5 py-1 text-xs rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 ${id ? 'cursor-pointer hover:bg-amber-500/20 transition-colors' : ''}`}
+                  onClick={() => id && navigate(`/topics/${id}`)}
+                >
+                  {label}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

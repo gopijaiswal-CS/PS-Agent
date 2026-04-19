@@ -52,7 +52,7 @@ Evaluate and respond ONLY with this JSON (no other text):
 
     try {
       const response = await this.client.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1000,
         messages: [{ role: 'user', content: 'Please evaluate this design.' }],
         system: systemPrompt,

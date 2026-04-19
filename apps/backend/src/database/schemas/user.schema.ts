@@ -53,6 +53,34 @@ export class User {
 
   @Prop()
   password: string;
+
+  // ── Onboarding profile ──────────────────────────────────────
+  @Prop({ default: '' })
+  currentRole: string;
+
+  @Prop({ default: 0 })
+  yearsExperience: number;
+
+  @Prop({ enum: ['startup', 'enterprise', 'product', 'agency'], default: 'product' })
+  companyType: string;
+
+  @Prop({ default: '' })
+  targetRole: string;
+
+  @Prop({ type: [String], default: [] })
+  targetCompanies: string[];
+
+  @Prop({ default: '' })
+  timeline: string;
+
+  @Prop({ default: 'marcus' })
+  coachPersona: string;
+
+  @Prop({ enum: ['direct', 'encouraging', 'socratic'], default: 'socratic' })
+  feedbackStyle: string;
+
+  @Prop({ default: false })
+  onboardingComplete: boolean;
 }
 
 export type UserDocument = User & Document;

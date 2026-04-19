@@ -10,8 +10,12 @@ import { Whiteboard } from '@/components/ui/Whiteboard';
 import { CodeWorkspace } from '@/components/ui/CodeWorkspace';
 import { ClassDesignWorkspace } from '@/components/ui/ClassDesignWorkspace';
 import { questionsApi } from '@/api/questions.api';
-import type { Question, AiRating } from '@/types';
 import { sessionsApi } from '@/api/sessions.api';
+import { coachApi } from '@/api/coach.api';
+import type { Question, AiRating } from '@/types';
+import { useAuthStore } from '@/store/authStore';
+
+const LAST_PRACTICE_TRACK_KEY = 'techprep:lastPracticeTrack';
 
 const TRACK_LABELS: Record<string, { name: string; icon: string }> = {
   hld: { name: 'High-Level Design', icon: '🏗️' },
@@ -41,6 +45,7 @@ const DifficultyDots: FC<{ level: number }> = ({ level }) => (
 export const PracticePage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthStore();
   const { questionId } = useParams<{ questionId?: string }>();
   const routeState = location.state as { trackId?: string; selectedQuestionId?: string } | null;
   
@@ -60,6 +65,7 @@ export const PracticePage: FC = () => {
   const [hintsUsed, setHintsUsed] = useState(0);
   const [currentHint, setCurrentHint] = useState<string | null>(null);
   const [transcript, setTranscript] = useState('');
+  const [sessionBriefOpen, setSessionBriefOpen] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -85,9 +91,36 @@ export const PracticePage: FC = () => {
     return null;
   }, [questionId, groupedQuestions]);
 
-  const activeTrack = routeState?.trackId || selectedQ?.track || 'hld';
+  const activeTrack = useMemo(() => {
+    const fromNav = routeState?.trackId;
+    if (fromNav && TRACK_LABELS[fromNav]) return fromNav;
+    if (selectedQ?.track && TRACK_LABELS[selectedQ.track]) return selectedQ.track;
+    try {
+      const last =
+        typeof window !== 'undefined' ? window.sessionStorage.getItem(LAST_PRACTICE_TRACK_KEY) : null;
+      if (last && TRACK_LABELS[last]) return last;
+    } catch {
+      /* ignore */
+    }
+    return 'hld';
+  }, [routeState?.trackId, selectedQ?.track, location.key]);
+
+  useEffect(() => {
+    const t = routeState?.trackId || selectedQ?.track;
+    if (!t || !TRACK_LABELS[t]) return;
+    try {
+      window.sessionStorage.setItem(LAST_PRACTICE_TRACK_KEY, t);
+    } catch {
+      /* ignore */
+    }
+  }, [routeState?.trackId, selectedQ?.track]);
+
   const visibleQuestions = groupedQuestions[activeTrack] || [];
   const selectedTrackLabel = TRACK_LABELS[activeTrack]?.name || 'Selected Track';
+
+  useEffect(() => {
+    if (!isSessionActive) setSessionBriefOpen(false);
+  }, [isSessionActive]);
 
   const handleStartSolving = useCallback(async () => {
     if (!selectedQ) return;
@@ -95,12 +128,14 @@ export const PracticePage: FC = () => {
       const res = await sessionsApi.create(selectedQ._id);
       setCurrentSessionId(res.data.data._id);
       setIsSessionActive(true);
+      setSessionBriefOpen(false);
       setHintsUsed(0);
       setCurrentHint(null);
     } catch (err) {
       console.error('Failed to initialize session on server.', err);
       // Fallback local mode
       setIsSessionActive(true);
+      setSessionBriefOpen(false);
     }
   }, [selectedQ]);
 
@@ -259,52 +294,83 @@ export const PracticePage: FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-[#06080F]">
           {selectedQ ? (
             <div className="flex-1 flex flex-col overflow-y-auto">
-              {/* Custom header area with gradient background */}
-              <div className="relative pt-8 pb-6 px-8 border-b border-theme/10">
-                <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-transparent pointer-events-none" />
-                <div className="relative max-w-4xl">
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div>
-                      <div className="flex items-center gap-3 mb-4 flex-wrap">
-                        <Badge variant="brand" className="backdrop-blur-sm bg-brand-500/10 border-brand-500/20">{selectedQ.tags[0]?.toUpperCase() || 'HLD'}</Badge>
-                        <div className="flex items-center gap-2 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
-                          <span className="text-xs font-semibold text-theme-muted uppercase tracking-wider">Difficulty</span>
-                          <DifficultyDots level={selectedQ.difficulty} />
+              {!isSessionActive ? (
+                <>
+                  {/* Custom header area with gradient background */}
+                  <div className="relative pt-8 pb-6 px-8 border-b border-theme/10">
+                    <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 to-transparent pointer-events-none" />
+                    <div className="relative max-w-4xl">
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-3 mb-4 flex-wrap">
+                            <Badge variant="brand" className="backdrop-blur-sm bg-brand-500/10 border-brand-500/20">{selectedQ.tags[0]?.toUpperCase() || 'HLD'}</Badge>
+                            <div className="flex items-center gap-2 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
+                              <span className="text-xs font-semibold text-theme-muted uppercase tracking-wider">Difficulty</span>
+                              <DifficultyDots level={selectedQ.difficulty} />
+                            </div>
+                            <span className="text-xs font-semibold text-theme-muted flex items-center gap-1.5 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                              {Math.floor(selectedQ.timeLimitSeconds / 60)} min
+                            </span>
+                          </div>
+                          <h2 className="text-3xl font-extrabold text-theme tracking-tight leading-tight">{selectedQ.title}</h2>
+                          <p className="text-sm text-theme-muted mt-3 max-w-2xl">
+                            Read the full prompt, sketch on the canvas, then start the session when you are ready to talk through the solution.
+                          </p>
                         </div>
-                        <span className="text-xs font-semibold text-theme-muted flex items-center gap-1.5 px-2 py-1 rounded bg-theme/30 border border-theme/10 backdrop-blur-sm">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                          {Math.floor(selectedQ.timeLimitSeconds / 60)} min
-                        </span>
                       </div>
-                      <h2 className="text-3xl font-extrabold text-theme tracking-tight leading-tight">{selectedQ.title}</h2>
-                      <p className="text-sm text-theme-muted mt-3 max-w-2xl">
-                        Read the full prompt, sketch on the canvas, then start the session when you are ready to talk through the solution.
-                      </p>
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {selectedQ.tags.slice(1).map((tag) => (
+                          <span key={tag} className="px-2 py-0.5 text-xs font-medium rounded border border-theme/20 text-theme-muted bg-theme/5"># {tag}</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {selectedQ.tags.slice(1).map((tag) => (
-                      <span key={tag} className="px-2 py-0.5 text-xs font-medium rounded border border-theme/20 text-theme-muted bg-theme/5"># {tag}</span>
-                    ))}
+                </>
+              ) : (
+                <>
+                  <div className="shrink-0 px-4 sm:px-6 py-3 border-b border-theme/15 bg-theme-elevated/30 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-2xs uppercase tracking-wider text-theme-muted mb-0.5">{selectedTrackLabel}</p>
+                      <h2 className="text-sm sm:text-base font-semibold text-theme truncate">{selectedQ.title}</h2>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      type="button"
+                      onClick={() => setSessionBriefOpen((o) => !o)}
+                    >
+                      {sessionBriefOpen ? 'Hide prompt' : 'Full prompt'}
+                    </Button>
                   </div>
-                </div>
-              </div>
+                  {sessionBriefOpen && (
+                    <div className="shrink-0 max-h-[42vh] overflow-y-auto border-b border-theme/15 px-6 py-4 bg-theme/25">
+                      <div className="max-w-4xl mx-auto prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed">
+                        <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Main Content Area */}
               <div className="flex-1 p-8 relative">
                 <div className="max-w-4xl">
-                  <div className="glass-card p-6 md:p-8 mb-8 border border-theme/20 shadow-xl">
-                    <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
-                      <div>
-                        <p className="text-2xs uppercase tracking-[0.22em] text-theme-muted mb-1">Question Brief</p>
-                        <h3 className="text-lg font-semibold text-theme">What you need to solve</h3>
+                  {!isSessionActive && (
+                    <div className="glass-card p-6 md:p-8 mb-8 border border-theme/20 shadow-xl">
+                      <div className="flex items-center justify-between gap-4 mb-5 flex-wrap">
+                        <div>
+                          <p className="text-2xs uppercase tracking-[0.22em] text-theme-muted mb-1">Question Brief</p>
+                          <h3 className="text-lg font-semibold text-theme">What you need to solve</h3>
+                        </div>
+                        <Badge variant="neutral">{selectedTrackLabel}</Badge>
                       </div>
-                      <Badge variant="neutral">{selectedTrackLabel}</Badge>
+                      <div className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed">
+                        <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
+                      </div>
                     </div>
-                    <div className="prose prose-sm prose-invert max-w-none text-slate-300 leading-relaxed">
-                      <div dangerouslySetInnerHTML={{ __html: selectedQ.description || '' }} />
-                    </div>
-                  </div>
+                  )}
 
                   {/* Hint display */}
                   {currentHint && (
@@ -333,9 +399,33 @@ export const PracticePage: FC = () => {
                     <div className="flex-1"></div>
                     
                     {!isSessionActive ? (
-                      <Button variant="primary" onClick={handleStartSolving} className="shrink-0 shadow-lg shadow-brand-500/20">
-                        <span className="mr-2">▶</span> Begin Session
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="secondary" onClick={handleStartSolving}>
+                          Standard Practice
+                        </Button>
+                        <Button
+                          variant="primary"
+                          onClick={async () => {
+                            const userAny = user as any;
+                            if (userAny && !userAny.onboardingComplete) {
+                              navigate('/onboarding');
+                              return;
+                            }
+                            try {
+                              const res = await coachApi.startSession({
+                                questionId: selectedQ._id,
+                                coachPersona: userAny?.coachPersona || 'marcus',
+                              });
+                              navigate(`/coach/${res.data.data.sessionId}`);
+                            } catch (err) {
+                              console.error('Failed to start coach session', err);
+                              alert('Error starting session.');
+                            }
+                          }}
+                        >
+                          <span className="mr-2">🤖</span> Live AI Coach
+                        </Button>
+                      </div>
                     ) : (
                       <Button variant="primary" onClick={handleRateDesign} loading={isRating} className="shrink-0 bg-gradient-to-r from-emerald-500 to-teal-500 border-none shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40">
                         <span className="mr-2">⭐</span> Evaluate My Design

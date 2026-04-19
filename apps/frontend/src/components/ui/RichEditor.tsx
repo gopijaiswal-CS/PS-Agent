@@ -7,7 +7,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { adminApi } from '@/api/admin.api';
-import { Button } from './Button';
 
 const lowlight = createLowlight(common);
 

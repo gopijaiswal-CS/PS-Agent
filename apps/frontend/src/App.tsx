@@ -18,6 +18,11 @@ import { useAuthStore } from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
 import { authApi } from '@/api/auth.api';
 
+// Add to top imports
+import { OnboardingPage } from '@/pages/onboarding/OnboardingPage';
+import { CoachPage } from '@/pages/coach/CoachPage';
+import { SessionReport } from '@/pages/coach/SessionReport';
+
 function App() {
   const { setAuth, setToken, logout, setLoading } = useAuthStore();
   const theme = useUiStore(state => state.theme);
@@ -65,6 +70,9 @@ function App() {
       <Routes>
         {/* Public route */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Onboarding route (unprotected but handles its own logic) */}
+        <Route path="/onboarding" element={<OnboardingPage />} />
 
         {/* Protected routes - require auth */}
         <Route element={<PrivateRoute />}>
@@ -76,6 +84,10 @@ function App() {
             <Route path="/topics" element={<TopicsPage />} />
             <Route path="/topics/:topicId" element={<TopicDetailPage />} />
           </Route>
+          
+          {/* Coach Routes */}
+          <Route path="/coach/:sessionId" element={<CoachPage />} />
+          <Route path="/coach/report/:sessionId" element={<SessionReport />} />
 
           {/* Admin routes - require admin role */}
           <Route element={<AdminRoute />}>

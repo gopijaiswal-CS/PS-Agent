@@ -1,4 +1,5 @@
 import client from './client';
+import axios from 'axios';
 import type { ApiResponse, User } from '@/types';
 
 export const authApi = {
@@ -12,7 +13,7 @@ export const authApi = {
     client.post<ApiResponse<{ accessToken: string; user: User }>>('/api/auth/oauth/callback', { supabaseToken }),
 
   refresh: () =>
-    client.post<ApiResponse<{ accessToken: string }>>('/api/auth/refresh'),
+    axios.post<ApiResponse<{ accessToken: string }>>(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/refresh`, {}, { withCredentials: true }),
 
   logout: () =>
     client.post('/api/auth/logout'),

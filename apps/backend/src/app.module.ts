@@ -9,6 +9,8 @@ import { SessionsModule } from './sessions/sessions.module';
 import { AiModule } from './ai/ai.module';
 import { AdminModule } from './admin/admin.module';
 import { UploadModule } from './upload/upload.module';
+import { CoachModule } from './coach/coach.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -30,6 +32,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     AiModule,
     AdminModule,
     UploadModule,
+    CoachModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [

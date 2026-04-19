@@ -32,7 +32,9 @@ client.interceptors.response.use(
         );
         if (!data.data.accessToken) {
           useAuthStore.getState().logout();
-          window.location.href = '/login';
+          if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/onboarding')) {
+            window.location.href = '/login';
+          }
           return Promise.reject(err);
         }
         useAuthStore.getState().setToken(data.data.accessToken);
@@ -40,7 +42,9 @@ client.interceptors.response.use(
         return client(err.config);
       } catch {
         useAuthStore.getState().logout();
-        window.location.href = '/login';
+        if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/onboarding')) {
+          window.location.href = '/login';
+        }
         return Promise.reject(err);
       }
     }

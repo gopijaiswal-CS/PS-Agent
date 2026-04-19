@@ -33,15 +33,22 @@ export class TopicsService {
   }
 
   async findById(id: string) {
-    const topic = await this.topicModel.findById(id).populate('prerequisites nextTopics').lean();
+    const topic = await this.topicModel
+      .findById(id)
+      .populate('prerequisites', '_id name category estimatedReadMinutes')
+      .populate('nextTopics', '_id name category estimatedReadMinutes')
+      .lean();
     if (!topic) throw new NotFoundException('Topic not found');
     return topic;
   }
 
   async findNextTopics(id: string) {
-    const topic = await this.topicModel.findById(id).populate('nextTopics').lean();
+    const topic = await this.topicModel
+      .findById(id)
+      .populate('nextTopics', '_id name category estimatedReadMinutes')
+      .lean();
     if (!topic) throw new NotFoundException('Topic not found');
-    return topic.nextTopics || [];
+    return (topic.nextTopics || []) as any[];
   }
 
   async create(dto: CreateTopicDto) {
